@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- ETABS' plugin host is a .NET Framework process, so the plugin must
+         target classic .NET Framework (not .NET / .NET Core) to load. -->
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>StoryFrameLoggerPlugin</RootNamespace>
+    <AssemblyName>StoryFrameLoggerPlugin</AssemblyName>
+    <OutputType>Library</OutputType>
+    <LangVersion>latest</LangVersion>
+    <Deterministic>true</Deterministic>
+    <!-- Default location if ETABS_INSTALL_DIR isn't supplied at build time. -->
+    <ETABS_INSTALL_DIR Condition="'$(ETABS_INSTALL_DIR)' == ''">C:\Program Files\Computers and Structures\ETABS 22</ETABS_INSTALL_DIR>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      ETABSv1.dll is CSI's .NET interop assembly and ships with every ETABS
+      installation. It is licensed CSI software and must NOT be committed to
+      this repository - reference the copy from your local install instead,
+      either by setting the ETABS_INSTALL_DIR property above/at the command
+      line, or by editing the HintPath directly. See ../../README.md.
+    -->
+    <Reference Include="ETABSv1">
+      <HintPath>$(ETABS_INSTALL_DIR)\ETABSv1.dll</HintPath>
+      <Private>False</Private>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+    </Reference>
+  </ItemGroup>
+
+</Project>
