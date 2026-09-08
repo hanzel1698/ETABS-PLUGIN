@@ -11,15 +11,19 @@ installer, one plugin, one job.
 ETABS' External Plugin mechanism lets a compiled .NET DLL run inside a
 live ETABS session without any external automation script. ETABS loads
 the DLL via reflection and looks for a class implementing the
-`ETABSv1.cPlugin` interface, which has two members:
+`ETABSv1.cPluginContract` interface, which has two members (confirmed
+by reflecting over an installed `ETABSv1.dll` — this shape differs
+from the older `cPlugin`/`cOAPI` pattern shown in some CSI examples):
 
 - `Info(ByRef Text As String) As Integer` — returns the label ETABS
   shows for the plugin in the External Plugin list.
-- `Main(ByRef ISapPlugin As cOAPI, ByRef ret As Integer)` — the entry
-  point ETABS calls when the user runs the plugin. `ISapPlugin` is a
-  live handle to the running ETABS application; `ISapPlugin.SapModel`
-  is the same `cSapModel` object used by ETABS' regular (external)
-  OAPI scripting.
+- `Main(ByRef SapModel As cSapModel, ByRef ISapPlugin As cPluginCallback)`
+  — the entry point ETABS calls when the user runs the plugin.
+  `SapModel` is the currently open model, handed to the plugin
+  directly (it may be `Nothing` if no model is open). `ISapPlugin` is
+  a callback object used to tell ETABS the plugin finished — call
+  `ISapPlugin.Finish(0)` on success or `ISapPlugin.Finish(1)` on
+  failure; there's no `ByRef ret` return value.
 
 `src/StoryFrameLoggerPlugin/Plugin.vb` implements this:
 
@@ -33,7 +37,8 @@ the DLL via reflection and looks for a class implementing the
    `%UserProfile%\Documents\ETABS-Plugin-Logs\` and shows it in a
    message box.
 5. Wraps everything in a `Try/Catch` so a COM failure or missing model
-   shows an error dialog instead of taking down ETABS.
+   shows an error dialog instead of taking down ETABS, and still
+   signals completion back to ETABS via `ISapPlugin.Finish(...)`.
 
 ## Prerequisites
 
@@ -107,7 +112,7 @@ Total frame objects: 18
 ```
 src/StoryFrameLoggerPlugin/
   StoryFrameLoggerPlugin.vbproj   Class library targeting net48
-  Plugin.vb                       cPlugin implementation
+  Plugin.vb                       cPluginContract implementation
 test-model/
   BUILD_TEST_MODEL.md             Steps to build the fixture model in ETABS
 ```

@@ -3,8 +3,8 @@
 '
 ' Proof-of-concept ETABS "External Plugin" that demonstrates the CSI OAPI
 ' plugin architecture end-to-end:
-'   1. Implements the ETABSv1.cPlugin contract required by ETABS to load and
-'      run a compiled DLL from the External Plugin dialog.
+'   1. Implements the ETABSv1.cPluginContract contract required by ETABS to
+'      load and run a compiled DLL from the External Plugin dialog.
 '   2. Reads basic data from whatever model is currently open (story names,
 '      total frame count, and a column/beam breakdown).
 '   3. Writes the results to a log file in the user's Documents folder and
@@ -16,6 +16,11 @@
 ' when the compiled DLL is added through File/Tools > External Plugin, so no
 ' COM registration step is required - only that the assembly is built against
 ' the same ETABSv1 interop referenced by the running ETABS instance.
+'
+' NOTE: the plugin contract shape here (cPluginContract.Main taking the open
+' cSapModel directly, plus a cPluginCallback used to signal completion via
+' Finish()) was confirmed by reflecting over an installed ETABSv1.dll; it
+' differs from the older cPlugin/cOAPI shape described in some CSI examples.
 ' =============================================================================
 
 Imports System
@@ -25,29 +30,32 @@ Imports System.Windows.Forms
 Imports ETABSv1
 
 Public Class StoryFrameLoggerPlugin
-    Implements cPlugin
+    Implements cPluginContract
 
     ''' <summary>
     ''' Entry point ETABS calls when the user runs the plugin from the
-    ''' External Plugin dialog. ISapPlugin is the live connection to the
-    ''' running ETABS instance - from it we reach the open model (SapModel).
+    ''' External Plugin dialog. SapModel is the currently open model (may be
+    ''' Nothing if no model is open); ISapPlugin is a callback handle used to
+    ''' tell ETABS the plugin is done via Finish(0 for success, non-zero for
+    ''' an error).
     ''' </summary>
-    ''' <param name="ISapPlugin">Handle to the running ETABS application, supplied by ETABS itself.</param>
-    ''' <param name="ret">0 on success, non-zero to signal an error back to ETABS.</param>
-    Public Sub Main(ByRef ISapPlugin As cOAPI, ByRef ret As Integer) Implements cPlugin.Main
-        ret = 0
-
+    ''' <param name="SapModel">The currently open model, supplied by ETABS.</param>
+    ''' <param name="ISapPlugin">Callback used to signal completion back to ETABS.</param>
+    Public Sub Main(ByRef SapModel As cSapModel, ByRef ISapPlugin As cPluginCallback) Implements cPluginContract.Main
         Try
             If ISapPlugin Is Nothing Then
-                ShowAndLogResult("Plugin error: ETABS did not supply an application handle.")
-                ret = 1
+                ' No callback to report through; surface the problem locally and bail.
+                MessageBox.Show(
+                    "Plugin error: ETABS did not supply a callback handle.",
+                    "Story/Frame Logger",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error)
                 Return
             End If
 
-            Dim sapModel As cSapModel = ISapPlugin.SapModel
-            If sapModel Is Nothing Then
+            If SapModel Is Nothing Then
                 ShowAndLogResult("No model is currently open in ETABS. Open a model and run the plugin again.")
-                ret = 1
+                ISapPlugin.Finish(1)
                 Return
             End If
 
@@ -56,26 +64,27 @@ Public Class StoryFrameLoggerPlugin
             report.AppendLine($"Run time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}")
             report.AppendLine()
 
-            AppendStorySummary(sapModel, report)
-            AppendFrameSummary(sapModel, report)
+            AppendStorySummary(SapModel, report)
+            AppendFrameSummary(SapModel, report)
 
             ShowAndLogResult(report.ToString())
+            ISapPlugin.Finish(0)
 
         Catch ex As Exception
             ' Any unexpected COM/API failure lands here instead of crashing ETABS.
-            ret = 1
             MessageBox.Show(
                 "Story/Frame Logger failed: " & ex.Message,
                 "Story/Frame Logger",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error)
+            If ISapPlugin IsNot Nothing Then ISapPlugin.Finish(1)
         End Try
     End Sub
 
     ''' <summary>
     ''' Text ETABS displays for this plugin in the External Plugin list.
     ''' </summary>
-    Public Function Info(ByRef Text As String) As Integer Implements cPlugin.Info
+    Public Function Info(ByRef Text As String) As Integer Implements cPluginContract.Info
         Text = "Story/Frame Logger (POC) - logs story names and column/beam counts for the open model"
         Info = 0
     End Function
