@@ -21,6 +21,13 @@
 ' cSapModel directly, plus a cPluginCallback used to signal completion via
 ' Finish()) was confirmed by reflecting over an installed ETABSv1.dll; it
 ' differs from the older cPlugin/cOAPI shape described in some CSI examples.
+'
+' NOTE: ETABS' loader resolves the plugin type by a hard-coded name -
+' "<RootNamespace>.cPlugin" - rather than scanning the assembly for whatever
+' implements cPluginContract. The class below MUST be named exactly cPlugin
+' (confirmed by an "Value cannot be null. (Parameter 'type')" failure in
+' ETABS when it wasn't) even though it implements the cPluginContract
+' interface, not a type literally called cPlugin.
 ' =============================================================================
 
 Imports System
@@ -29,7 +36,7 @@ Imports System.Text
 Imports System.Windows.Forms
 Imports ETABSv1
 
-Public Class StoryFrameLoggerPlugin
+Public Class cPlugin
     Implements cPluginContract
 
     ''' <summary>

@@ -25,6 +25,14 @@ from the older `cPlugin`/`cOAPI` pattern shown in some CSI examples):
   `ISapPlugin.Finish(0)` on success or `ISapPlugin.Finish(1)` on
   failure; there's no `ByRef ret` return value.
 
+**Important gotcha**: ETABS' loader resolves the plugin type by a
+hard-coded name — `<RootNamespace>.cPlugin` — instead of scanning the
+DLL for whatever class implements `cPluginContract`. The implementing
+class must literally be named `cPlugin`, or ETABS fails to load it
+with `Cannot create plugin. Value cannot be null. (Parameter 'type')`.
+(Confirmed empirically: the class was originally named
+`StoryFrameLoggerPlugin` and hit exactly that error.)
+
 `src/StoryFrameLoggerPlugin/Plugin.vb` implements this:
 
 1. Guards against `ISapPlugin` or `SapModel` being unavailable (no
